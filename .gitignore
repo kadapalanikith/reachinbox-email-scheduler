@@ -38,3 +38,9 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Sensitive local session files (curl cookie jars, etc.)
+cookies.txt
+
+# Agent scaffolding (not part of project source)
+.agents/

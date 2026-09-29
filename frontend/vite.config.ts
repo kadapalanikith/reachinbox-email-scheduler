@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+// Vite configuration with Tailwind PostCSS support
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({

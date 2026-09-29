@@ -3,6 +3,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { getBullRedisConfig } from '../config/redis.js';
+import { env } from '../config/env.js';
 
 export const EMAIL_QUEUE_NAME = 'email-dispatch-queue';
 
@@ -41,6 +42,34 @@ export const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
 createBullBoard({
-  queues: [new BullMQAdapter(emailQueue)],
+  queues: [
+    new BullMQAdapter(emailQueue, {
+      displayName: 'ReachInbox Outreach Dispatch Queue',
+      description: 'Handles BullMQ delayed dispatches, 100/hr sender rate-limiting, and retry backoffs.',
+      allowRetries: true,
+      readOnlyMode: false,
+    }),
+  ],
   serverAdapter: serverAdapter,
+  options: {
+    uiConfig: {
+      boardTitle: 'ReachInbox Queue Monitor',
+      miscLinks: [
+        {
+          text: 'Back to ReachInbox Dashboard',
+          // Use env CLIENT_URL so this works in production, not just localhost
+          url: `${env.CLIENT_URL}/dashboard`,
+        },
+      ],
+      environment: {
+        label: 'BullMQ Production',
+        color: '#4F46E5',
+        textColor: '#FFFFFF',
+      },
+      pollingInterval: {
+        showSetting: true,
+        forceInterval: 3000,
+      },
+    },
+  },
 });

@@ -1,4 +1,5 @@
 import express from 'express';
+// Reload trigger for synced .env Google OAuth credentials
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';

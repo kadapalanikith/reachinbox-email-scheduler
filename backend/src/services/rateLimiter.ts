@@ -50,7 +50,7 @@ const RATE_LIMIT_LUA_SCRIPT = `
   local maxLimit = tonumber(ARGV[1])
   local ttlSeconds = tonumber(ARGV[2])
 
-  local current = redisClient.call('GET', rateKey)
+  local current = redis.call('GET', rateKey)
   local currentCount = 0
   if current then
     currentCount = tonumber(current)
@@ -58,23 +58,23 @@ const RATE_LIMIT_LUA_SCRIPT = `
 
   if currentCount < maxLimit then
     -- Under limit, atomically increment and refresh TTL
-    currentCount = redisClient.call('INCR', rateKey)
+    currentCount = redis.call('INCR', rateKey)
     if currentCount == 1 then
-      redisClient.call('EXPIRE', rateKey, ttlSeconds)
+      redis.call('EXPIRE', rateKey, ttlSeconds)
     end
     return {1, currentCount, 0, 0}
   else
     -- Limit breached! Check if we should notify Slack (atomic SET NX)
     local shouldNotify = 0
-    local alertSet = redisClient.call('SET', alertKey, '1', 'EX', ttlSeconds, 'NX')
+    local alertSet = redis.call('SET', alertKey, '1', 'EX', ttlSeconds, 'NX')
     if alertSet then
       shouldNotify = 1
     end
 
     -- Increment overflow counter for next window to stagger delays
-    local overflowIndex = redisClient.call('INCR', overflowKey)
+    local overflowIndex = redis.call('INCR', overflowKey)
     if overflowIndex == 1 then
-      redisClient.call('EXPIRE', overflowKey, ttlSeconds * 2)
+      redis.call('EXPIRE', overflowKey, ttlSeconds * 2)
     end
 
     return {0, currentCount, shouldNotify, overflowIndex}
