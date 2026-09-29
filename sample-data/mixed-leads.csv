@@ -1,0 +1,7 @@
+name,email
+Alice Green,alice.green@innovate.com
+Bob Miller,bob.miller@global.org
+Duplicate Alice,alice.green@innovate.com
+Invalid Entry,invalid-not-an-email
+Charlie Vance,charlie.vance@outreach.dev
+Empty Mail,
