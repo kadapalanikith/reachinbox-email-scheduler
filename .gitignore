@@ -44,3 +44,6 @@ cookies.txt
 
 # Agent scaffolding (not part of project source)
 .agents/
+
+# Personal demo recording guide (not part of submission)
+DEMO_VIDEO_GUIDE.md
