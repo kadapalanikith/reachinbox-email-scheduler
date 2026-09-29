@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Zap, Shield, Database, ArrowRight, AlertCircle, Activity, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { API_BASE } from '../services/api';
 
 export const LoginPage: React.FC = () => {
   const { loginWithDemo } = useAuth();
@@ -12,7 +13,7 @@ export const LoginPage: React.FC = () => {
   const errorParam = searchParams.get('error');
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = `${API_BASE}/auth/google`;
   };
 
   const handleDemoLogin = async () => {

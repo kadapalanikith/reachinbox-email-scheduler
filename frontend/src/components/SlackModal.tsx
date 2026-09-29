@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Bell, Unlink, ExternalLink } from 'lucide-react';
 import { SlackStatus } from '../types/index';
-import { api } from '../services/api';
+import { api, API_BASE } from '../services/api';
 
 interface SlackModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export const SlackModal: React.FC<SlackModalProps> = ({ isOpen, onClose, status,
 
   if (!isOpen) return null;
 
-  const handleConnect = () => { window.location.href = '/api/slack/connect'; };
+  const handleConnect = () => { window.location.href = `${API_BASE}/slack/connect`; };
 
   const handleDisconnect = async () => {
     setDisconnecting(true);

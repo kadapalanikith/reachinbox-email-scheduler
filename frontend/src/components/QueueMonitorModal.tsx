@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, ExternalLink, Activity } from 'lucide-react';
+import { BACKEND_URL } from '../services/api';
 
 interface QueueMonitorModalProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export const QueueMonitorModal: React.FC<QueueMonitorModalProps> = ({ isOpen, on
 
           <div className="flex items-center gap-2">
             <a
-              href="/admin/queues"
+              href={`${BACKEND_URL}/admin/queues`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
@@ -53,7 +54,7 @@ export const QueueMonitorModal: React.FC<QueueMonitorModalProps> = ({ isOpen, on
         {/* Embedded Bull Board Iframe */}
         <div className="flex-1 w-full bg-[#181d25] relative">
           <iframe
-            src="/admin/queues"
+            src={`${BACKEND_URL}/admin/queues`}
             title="Bull Board Queue Monitor"
             className="w-full h-full border-0"
           />

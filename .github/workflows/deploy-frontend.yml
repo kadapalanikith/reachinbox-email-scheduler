@@ -38,8 +38,8 @@ jobs:
       - name: Build production bundle
         working-directory: frontend
         env:
-          # EC2 backend URL — set this in GitHub → Settings → Secrets → Actions
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          # Production API URL — defaults to https://api.nikith.app or uses repo secret if set
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://api.nikith.app' }}
           # GitHub Pages base path (matches repo name)
           VITE_BASE_PATH: /reachinbox-email-scheduler/
         run: npm run build

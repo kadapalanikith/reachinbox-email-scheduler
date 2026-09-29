@@ -15,22 +15,31 @@ import { createEmailWorker } from './workers/emailWorker.js';
 export const app = express();
 
 // ─── CORS ───────────────────────────────────────────────────────
-// In production, only allow the exact frontend origin (GitHub Pages URL).
-// In development, allow localhost:5173 for the Vite dev server.
-const allowedOrigins = [
-  env.CLIENT_URL,
+// Explicit allowlist: GitHub Pages origin, CLIENT_URL origin, and local dev
+const allowedOrigins = new Set<string>([
+  'https://kadapalanikith.github.io',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-];
+]);
+
+if (env.CLIENT_URL) {
+  try {
+    const parsed = new URL(env.CLIENT_URL);
+    allowedOrigins.add(parsed.origin);
+  } catch {
+    allowedOrigins.add(env.CLIENT_URL.replace(/\/+$/, ''));
+  }
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow server-to-server requests (no origin) and allowed list
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow server-to-server requests (no origin) and allowed origins
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS: origin '${origin}' not allowed`));
+        // Graceful CORS rejection without crashing Express with 500
+        callback(null, false);
       }
     },
     credentials: true,

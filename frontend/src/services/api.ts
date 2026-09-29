@@ -1,11 +1,14 @@
 import axios from 'axios';
 import { User, EmailItem, Sender, SlackStatus, CsvParseResult } from '../types/index';
 
-// In production (GitHub Pages), VITE_API_URL points to the EC2 backend.
+// In production (GitHub Pages), VITE_API_URL points to the EC2 backend (https://api.nikith.app).
 // In local dev, the Vite proxy handles /api → localhost:5000 transparently.
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+export const BACKEND_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://api.nikith.app' : '')
+).replace(/\/+$/, '');
+
+export const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
