@@ -54,8 +54,11 @@ export async function scheduleEmailCampaign(input: ScheduleCampaignInput) {
   const startTime = new Date(startTimestamp);
 
   // 1. Resolve Sender
-  let senderId = input.senderId;
-  if (!senderId) {
+  let senderId: string;
+
+  if (input.senderId) {
+    senderId = input.senderId;
+  } else {
     const defaultSender = await getOrCreateDefaultSender(userId);
     senderId = defaultSender.id;
   }
