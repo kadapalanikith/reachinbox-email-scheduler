@@ -3,12 +3,18 @@ import {
   googleLoginRedirect,
   googleCallback,
   demoLogin,
+  register,
+  login,
   getCurrentUser,
   logout,
 } from '../controllers/authController.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+
+// Email / Password Registration & Login
+router.post('/register', register);
+router.post('/login', login);
 
 // Google OAuth
 router.get('/google', googleLoginRedirect);

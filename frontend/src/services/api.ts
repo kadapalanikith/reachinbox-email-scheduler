@@ -24,6 +24,14 @@ export const api = {
       const res = await apiClient.get('/auth/me');
       return res.data.data.user;
     },
+    login: async (data: { email: string; password: string }): Promise<User> => {
+      const res = await apiClient.post('/auth/login', data);
+      return res.data.data.user;
+    },
+    register: async (data: { email: string; password: string; name?: string }): Promise<User> => {
+      const res = await apiClient.post('/auth/register', data);
+      return res.data.data.user;
+    },
     demoLogin: async (): Promise<User> => {
       const res = await apiClient.post('/auth/demo-login');
       return res.data.data.user;

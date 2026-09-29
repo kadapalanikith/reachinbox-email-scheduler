@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { API_BASE } from '../services/api';
 
 export const LoginPage: React.FC = () => {
-  const { loginWithDemo } = useAuth();
+  const { loginWithDemo, loginWithEmail } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const errorParam = searchParams.get('error');
 
@@ -18,30 +20,82 @@ export const LoginPage: React.FC = () => {
     window.location.href = `${API_BASE}/auth/google`;
   };
 
-  const handleDemoLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDemoLogin = async () => {
     setLoadingDemo(true);
+    setError(null);
     try {
       await loginWithDemo();
       navigate('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Demo login failed', err);
+      setError('Demo login failed. Please try again.');
     } finally {
       setLoadingDemo(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm p-8">
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-gray-900 text-center mb-6">Login</h1>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-        {/* Error alert */}
+    // If both empty, fallback to demo login for 1-click convenience
+    if (!email.trim() && !password) {
+      return handleDemoLogin();
+    }
+
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await loginWithEmail(email.trim(), password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      const serverMessage = err.response?.data?.error?.message;
+      if (serverMessage && !serverMessage.toLowerCase().includes('database') && !serverMessage.toLowerCase().includes('prisma')) {
+        setError(serverMessage);
+      } else {
+        setError('Invalid email or password.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm p-8">
+        {/* ReachInbox Branding */}
+        <div className="text-center mb-1">
+          <span className="text-xs font-bold tracking-widest uppercase text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
+            ReachInbox
+          </span>
+        </div>
+
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-gray-900 text-center mt-2 mb-6">Login</h1>
+
+        {/* OAuth URL Error alert */}
         {errorParam && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-700">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorParam}</span>
+          </div>
+        )}
+
+        {/* Local / Form Error alert */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -81,28 +135,34 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Email / Password form */}
-        <form onSubmit={handleDemoLogin} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="email"
             placeholder="Email ID"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:bg-white transition-colors"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:bg-white transition-colors"
           />
 
           <button
             type="submit"
-            disabled={loadingDemo}
+            disabled={loading || loadingDemo}
             className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors duration-150 cursor-pointer flex items-center justify-center gap-2"
           >
-            {loadingDemo ? (
+            {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>Signing in...</span>
@@ -113,10 +173,37 @@ export const LoginPage: React.FC = () => {
           </button>
         </form>
 
-        {/* Reviewer access note */}
-        <p className="mt-4 text-center text-xs text-gray-400">
-          Reviewer? Leave fields blank and click Login for 1-click demo access.
-        </p>
+        {/* Sign up link */}
+        <div className="mt-4 text-center text-xs text-gray-500">
+          Don't have an account?{' '}
+          <Link to="/register" className="font-semibold text-green-600 hover:text-green-700 hover:underline">
+            Sign up
+          </Link>
+        </div>
+
+        {/* Divider for Reviewer */}
+        <div className="relative flex items-center my-4">
+          <div className="flex-1 border-t border-gray-100" />
+          <span className="px-2 text-[11px] text-gray-400">or evaluator</span>
+          <div className="flex-1 border-t border-gray-100" />
+        </div>
+
+        {/* Reviewer 1-Click Access Button */}
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          disabled={loadingDemo || loading}
+          className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer flex items-center justify-center gap-2"
+        >
+          {loadingDemo ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <span>Signing in as Reviewer...</span>
+            </>
+          ) : (
+            'Reviewer 1-Click Access'
+          )}
+        </button>
       </div>
     </div>
   );

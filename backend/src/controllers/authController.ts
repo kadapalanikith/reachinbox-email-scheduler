@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { getGoogleAuthUrl, getGoogleUserFromCode } from '../integrations/google.js';
 import { signToken } from '../utils/jwt.js';
+import { hashPassword, verifyPassword, isValidEmail } from '../utils/password.js';
 
 const COOKIE_NAME = 'token';
 const COOKIE_OPTIONS = {
@@ -169,4 +170,188 @@ export async function logout(req: Request, res: Response) {
     success: true,
     message: 'Logged out successfully',
   });
+}
+
+/**
+ * Email/Password Registration endpoint
+ */
+export async function register(req: Request, res: Response) {
+  try {
+    const { email, password, name } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is required.' },
+      });
+      return;
+    }
+
+    if (!password || typeof password !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Password is required.' },
+      });
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!isValidEmail(trimmedEmail)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Please enter a valid email address.' },
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Password must be at least 6 characters long.' },
+      });
+      return;
+    }
+
+    const normalizedEmail = trimmedEmail.toLowerCase();
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'An account with this email already exists.' },
+      });
+      return;
+    }
+
+    // Hash password securely
+    const passwordHash = await hashPassword(password);
+
+    const displayName = (name && typeof name === 'string' && name.trim())
+      ? name.trim()
+      : normalizedEmail.split('@')[0];
+
+    const user = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        name: displayName,
+        passwordHash,
+      },
+    });
+
+    // Create default sender for newly registered user
+    await prisma.sender.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        isDefault: true,
+      },
+    });
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Register Error]:', error.message);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Registration failed. Please try again later.' },
+    });
+  }
+}
+
+/**
+ * Email/Password Login endpoint
+ */
+export async function login(req: Request, res: Response) {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is required.' },
+      });
+      return;
+    }
+
+    if (!password || typeof password !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Password is required.' },
+      });
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    // Do not reveal whether user exists
+    if (!user || !user.passwordHash) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid email or password.' },
+      });
+      return;
+    }
+
+    const isMatch = await verifyPassword(password, user.passwordHash);
+    if (!isMatch) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid email or password.' },
+      });
+      return;
+    }
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Login Error]:', error.message);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Login failed. Please try again later.' },
+    });
+  }
 }

@@ -5,6 +5,8 @@ import { api } from '../services/api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  registerWithEmail: (email: string, password: string, name?: string) => Promise<void>;
   loginWithDemo: () => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -31,6 +33,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
+  const loginWithEmail = async (email: string, password: string) => {
+    setLoading(true);
+    try {
+      const loggedIn = await api.auth.login({ email, password });
+      setUser(loggedIn);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerWithEmail = async (email: string, password: string, name?: string) => {
+    setLoading(true);
+    try {
+      const registered = await api.auth.register({ email, password, name });
+      setUser(registered);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loginWithDemo = async () => {
     setLoading(true);
     try {
@@ -50,7 +72,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithDemo, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        loginWithEmail,
+        registerWithEmail,
+        loginWithDemo,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
