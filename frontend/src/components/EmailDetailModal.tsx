@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Mail, Clock, Calendar, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Star, ExternalLink, AlertTriangle } from 'lucide-react';
 import { EmailItem } from '../types/index';
 
 interface EmailDetailModalProps {
@@ -7,137 +7,175 @@ interface EmailDetailModalProps {
   onClose: () => void;
 }
 
+const formatFullDate = (ts: string | null): string => {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let hours = d.getHours();
+    const mins = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${months[d.getMonth()]} ${d.getDate()}, ${hours}:${mins} ${ampm}`;
+  } catch {
+    return ts;
+  }
+};
+
+const getInitial = (email: string): string => {
+  const local = email.split('@')[0];
+  return local.charAt(0).toUpperCase();
+};
+
+const getRecipientName = (email: string): string => {
+  const local = email.split('@')[0];
+  return local
+    .split(/[._-]/)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+};
+
 export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, onClose }) => {
   if (!email) return null;
 
-  const isSent = email.status === 'SENT';
-  const isFailed = email.status === 'FAILED';
-  const isScheduled = email.status === 'SCHEDULED';
-  const isProcessing = email.status === 'PROCESSING';
-
-  const formatFullDate = (ts: string | null) => {
-    if (!ts) return 'Not available';
-    try {
-      return new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'full',
-        timeStyle: 'medium',
-      }).format(new Date(ts));
-    } catch {
-      return ts;
-    }
-  };
+  const recipientName = getRecipientName(email.recipient);
+  const senderEmail = email.sender?.email || email.recipient;
+  const senderName = email.sender?.name || getRecipientName(senderEmail);
+  const dateDisplay = formatFullDate(email.sentAt || email.scheduledAt);
+  const initial = getInitial(senderEmail);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-scale-up overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <Mail className="w-4.5 h-4.5 stroke-[1.75]" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Email Details</h3>
-              <p className="text-xs text-slate-500 font-mono truncate max-w-xs">{email.id}</p>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-white animate-fade-in" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
+        <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer flex-shrink-0"
           >
-            <X className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
+          {/* Email subject as title */}
+          <h1 className="text-sm font-semibold text-gray-800 truncate max-w-lg">
+            {recipientName ? `${recipientName.split(' ')[0]}, hello there!` : email.subject}{' '}
+            <span className="font-mono text-xs text-gray-400 ml-1">
+              | {email.id.slice(0, 12).toUpperCase()}
+            </span>
+          </h1>
+        </div>
+        {/* Right actions */}
+        <div className="flex items-center gap-2">
+          <button className="p-1.5 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors">
+            <Star className="w-4 h-4" />
+          </button>
+          {email.etherealPreviewUrl && (
+            <a
+              href={email.etherealPreviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+              title="Open in mailbox"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+          {/* User avatar */}
+          <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {initial}
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 max-w-3xl w-full mx-auto">
+        {/* Sender info row */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-start gap-3">
+            {/* Avatar */}
+            <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+              {initial}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-gray-900">{senderName}</span>
+                <span className="text-xs text-gray-400">&lt;{senderEmail}&gt;</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">to me</div>
+            </div>
+          </div>
+          <div className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 mt-1">
+            {dateDisplay}
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-4 overflow-y-auto">
-          {/* Status Banner */}
-          <div
-            className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${
-              isSent
-                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
-                : isFailed
-                ? 'bg-red-50/80 border-red-200 text-red-800'
-                : isProcessing
-                ? 'bg-amber-50/80 border-amber-200 text-amber-800'
-                : 'bg-indigo-50/80 border-indigo-200 text-indigo-800'
-            }`}
-          >
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              {isSent && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-              {isFailed && <AlertTriangle className="w-4 h-4 text-red-600" />}
-              {isScheduled && <Calendar className="w-4 h-4 text-indigo-600" />}
-              {isProcessing && <Clock className="w-4 h-4 text-amber-600 animate-spin" />}
-              <span>Status: {email.status}</span>
-            </div>
-            {email.etherealPreviewUrl && (
-              <a
-                href={email.etherealPreviewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer shadow-xs"
-              >
-                View in Mailbox
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
-          </div>
-
-          {/* Key metadata grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 border border-slate-100 rounded-xl p-4">
+        {/* Status banner if failed */}
+        {email.status === 'FAILED' && email.errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-700">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="text-slate-400 font-medium block">Recipient</span>
-              <span className="font-semibold text-slate-800 font-mono text-sm break-all">{email.recipient}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 font-medium block">Sender</span>
-              <span className="font-semibold text-slate-800 font-mono text-sm break-all">
-                {email.sender?.email || 'System Default'}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-400 font-medium block">Scheduled For</span>
-              <span className="text-slate-700 font-medium">{formatFullDate(email.scheduledAt)}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 font-medium block">Sent At</span>
-              <span className="text-slate-700 font-medium">{formatFullDate(email.sentAt)}</span>
+              <span className="font-semibold block">Delivery Failed</span>
+              <span className="text-xs">{email.errorMessage}</span>
             </div>
           </div>
+        )}
 
-          {/* Failure message if any */}
-          {email.errorMessage && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 space-y-1">
-              <span className="font-bold uppercase tracking-wider text-[10px] text-red-600 block">Dispatch Error</span>
-              <p className="font-mono text-xs">{email.errorMessage}</p>
+        {/* Email body */}
+        <div
+          className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap"
+          style={{ fontFamily: 'inherit' }}
+        >
+          {email.body ? (
+            // If body looks like HTML, render it; otherwise render as text
+            email.body.trim().startsWith('<') ? (
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: email.body }}
+              />
+            ) : (
+              email.body
+            )
+          ) : (
+            <span className="text-gray-400 italic">No email body available.</span>
+          )}
+        </div>
+
+        {/* Metadata footer */}
+        <div className="mt-8 pt-6 border-t border-gray-100 grid grid-cols-2 gap-4 text-xs text-gray-400">
+          <div>
+            <span className="font-medium text-gray-500 block mb-0.5">To</span>
+            <span className="text-gray-700 font-mono">{email.recipient}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-500 block mb-0.5">From</span>
+            <span className="text-gray-700 font-mono">{senderEmail}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-500 block mb-0.5">Subject</span>
+            <span className="text-gray-700">{email.subject}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-500 block mb-0.5">Status</span>
+            <span className={`font-medium ${
+              email.status === 'SENT' ? 'text-green-600' :
+              email.status === 'FAILED' ? 'text-red-600' :
+              email.status === 'PROCESSING' ? 'text-amber-600' :
+              'text-gray-600'
+            }`}>
+              {email.status.charAt(0) + email.status.slice(1).toLowerCase()}
+            </span>
+          </div>
+          {email.scheduledAt && (
+            <div>
+              <span className="font-medium text-gray-500 block mb-0.5">Scheduled</span>
+              <span className="text-gray-700">{formatFullDate(email.scheduledAt)}</span>
             </div>
           )}
-
-          {/* Subject */}
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Subject</label>
-            <div className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900">
-              {email.subject}
+          {email.sentAt && (
+            <div>
+              <span className="font-medium text-gray-500 block mb-0.5">Delivered</span>
+              <span className="text-gray-700">{formatFullDate(email.sentAt)}</span>
             </div>
-          </div>
-
-          {/* Body Content */}
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Email Body</label>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
-              {email.body}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl transition-all cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-          >
-            Close
-          </button>
+          )}
         </div>
       </div>
     </div>
