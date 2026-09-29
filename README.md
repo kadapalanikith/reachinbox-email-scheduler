@@ -242,3 +242,55 @@ npm run test
 1. **Calendar Hour vs. Sliding Window**: We implemented fixed calendar hour windows (`YYYY-MM-DD-HH` UTC) matching the assignment's explicit key schema (`rate:{senderId}:{hourWindow}`). Staggered delays ensure traffic does not spike at the hour boundary.
 2. **Ethereal Mailbox**: When no static credentials are provided in `.env`, Nodemailer dynamically provisions a real Ethereal account on startup and logs the login details to stdout.
 3. **Dual Login Flow**: Real Google OAuth is primary; the demo button exists solely to facilitate frictionless evaluator testing.
+
+---
+
+## ☁️ Production Deployment (AWS EC2 + GitHub Pages)
+
+The production architecture is fully containerized and decoupled:
+- **Frontend**: Deployed to **GitHub Pages** with GitHub Actions CI/CD (`.github/workflows/deploy-frontend.yml`).
+- **Backend API & Queue Worker**: Run as independent services in `docker-compose.prod.yml` on **AWS EC2 (Ubuntu 24.04 LTS)**.
+- **Database & Queue**: PostgreSQL 15, Redis 7 (AOF persistence), and Elasticsearch 8.11 run inside isolated Docker networks with named persistent volumes.
+- **Reverse Proxy**: Nginx with Let's Encrypt automated TLS certificates.
+
+For complete, step-by-step AWS provisioning, budget alert setup, SSL certificate issuance, and domain configuration, refer to the [DEPLOYMENT_GUIDE.md](file:///d:/reachinbox-email-scheduler/DEPLOYMENT_GUIDE.md).
+
+### Quick Production Deployment Commands:
+```bash
+# 1. On your EC2 instance:
+git clone https://github.com/kadapalanikith/reachinbox-email-scheduler.git
+cd reachinbox-email-scheduler
+cp .env.production.example .env
+nano .env
+
+# 2. Run the deployment script:
+chmod +x deploy.sh
+./deploy.sh
+```
+
+---
+
+## 📡 API Endpoints Reference
+
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Public | Backend, Redis, and Elasticsearch status |
+| `GET` | `/admin/queues` | Admin | Bull Board real-time queue monitor |
+| `GET` | `/api/auth/google` | Public | Initiates Google OAuth 2.0 flow |
+| `GET` | `/api/auth/google/callback` | Public | Handles Google OAuth redirect & sets JWT cookie |
+| `POST`| `/api/auth/demo-login` | Public | Evaluator 1-click test login |
+| `GET` | `/api/auth/me` | JWT | Returns current authenticated user |
+| `POST`| `/api/auth/logout` | Public | Clears session cookie |
+| `POST`| `/api/emails/schedule` | JWT | Schedules batch campaigns with staggered delays |
+| `POST`| `/api/emails/parse-csv` | JWT | Parses CSV file or raw text recipient lists |
+| `GET` | `/api/emails/scheduled` | JWT | Fetches scheduled & processing emails |
+| `GET` | `/api/emails/sent` | JWT | Fetches sent & failed email history |
+| `GET` | `/api/emails/search?q=...` | JWT | Scoped Elasticsearch full-text search |
+| `GET` | `/api/emails/senders` | JWT | Lists available sender profiles |
+| `POST`| `/api/emails/senders` | JWT | Creates a new sender profile |
+| `GET` | `/api/slack/connect` | JWT | Initiates Slack OAuth connection |
+| `GET` | `/api/slack/callback` | Public | Slack OAuth callback & token storage |
+| `GET` | `/api/slack/status` | JWT | Checks Slack workspace connection status |
+| `POST`| `/api/slack/disconnect` | JWT | Unlinks Slack workspace |
+| `POST`| `/api/slack/test` | JWT | Triggers a test rate-limit alert to Slack |
+

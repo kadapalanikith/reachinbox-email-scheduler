@@ -1,0 +1,201 @@
+# =====================================================
+# ReachInbox Email Scheduler — Production Docker Compose
+# Target: AWS EC2 Ubuntu 24.04 + Docker Engine
+# Run:  docker compose -f docker-compose.prod.yml up -d
+# =====================================================
+services:
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL 15 — persistent relational DB
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: reachinbox_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reachinbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-reachinbox_scheduler}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reachinbox_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reachinbox} -d ${POSTGRES_DB:-reachinbox_scheduler}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # No external port exposure — internal Docker network only
+
+  # ─────────────────────────────────────────────
+  # Redis 7 — BullMQ queues + rate limiting
+  # AOF persistence enabled for BullMQ restart safety
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: reachinbox_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    networks:
+      - reachinbox_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # No external port exposure
+
+  # ─────────────────────────────────────────────
+  # Elasticsearch 8.11 — full-text email search
+  # Memory: 512m heap (sufficient for assignment scale)
+  # ─────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: reachinbox_elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - reachinbox_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    # No external port exposure
+
+  # ─────────────────────────────────────────────
+  # Backend API — Express.js on port 5000
+  # Starts worker inline unless START_WORKER=false
+  # ─────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: reachinbox_backend:latest
+    container_name: reachinbox_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - START_WORKER=false   # Worker runs as a separate container
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-reachinbox}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-reachinbox_scheduler}
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    ports:
+      - "5000:5000"
+    networks:
+      - reachinbox_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────
+  # BullMQ Worker — SEPARATE container (required by assignment)
+  # Processes delayed jobs from Redis queue
+  # ─────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: reachinbox_worker:latest
+    container_name: reachinbox_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-reachinbox}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-reachinbox_scheduler}
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - reachinbox_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────
+  # Nginx — reverse proxy + TLS termination
+  # Exposes only ports 80 and 443 to internet
+  # ─────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: reachinbox_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - certbot_webroot:/var/www/certbot:ro
+    networks:
+      - reachinbox_net
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────
+  # Certbot — Let's Encrypt TLS certificate renewal
+  # ─────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: reachinbox_certbot
+    volumes:
+      - ./nginx/certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+
+# ─────────────────────────────────────────────
+# Named volumes — data survives restarts
+# NEVER run `docker compose down -v` in production
+# ─────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  certbot_webroot:
+    driver: local
+
+networks:
+  reachinbox_net:
+    driver: bridge

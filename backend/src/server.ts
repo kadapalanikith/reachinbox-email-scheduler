@@ -1,5 +1,4 @@
 import express from 'express';
-// Reload trigger for synced .env Google OAuth credentials
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
@@ -15,26 +14,46 @@ import { createEmailWorker } from './workers/emailWorker.js';
 
 export const app = express();
 
-// Middlewares
+// ─── CORS ───────────────────────────────────────────────────────
+// In production, only allow the exact frontend origin (GitHub Pages URL).
+// In development, allow localhost:5173 for the Vite dev server.
+const allowedOrigins = [
+  env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
+
 app.use(
   cors({
-    origin: [env.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no origin) and allowed list
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin '${origin}' not allowed`));
+      }
+    },
     credentials: true,
   })
 );
+
+// ─── Core Middlewares ────────────────────────────────────────────
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Bull Board real-time queue visibility UI
+// Trust proxy headers from Nginx (required for secure cookies, X-Forwarded-For)
+app.set('trust proxy', 1);
+
+// ─── Bull Board ──────────────────────────────────────────────────
 app.use('/admin/queues', serverAdapter.getRouter());
 
-// API Routes
+// ─── API Routes ─────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/slack', slackRoutes);
 app.use('/api/emails', emailRoutes);
 
-// Health check endpoint
+// ─── Health Check ────────────────────────────────────────────────
 app.get('/health', async (req, res) => {
   const redisHealthy = redisClient.status === 'ready' || redisClient.status === 'connect';
   const esHealthy = isESAvailable();
@@ -42,6 +61,7 @@ app.get('/health', async (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV,
     services: {
       redis: redisHealthy ? 'connected' : 'disconnected',
       elasticsearch: esHealthy ? 'connected' : 'unavailable',
@@ -49,7 +69,7 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// Centralized Error Handling
+// ─── Error Handler ───────────────────────────────────────────────
 app.use(errorHandler);
 
 let workerInstance: any = null;
@@ -69,7 +89,8 @@ export async function startServer() {
       console.warn('[SMTP] Initial transport warning:', err.message);
     });
 
-    // 4. Start BullMQ worker in the same process if configured (or run standalone via worker.ts)
+    // 4. Start BullMQ worker in-process only if START_WORKER !== 'false'
+    // In production Docker Compose, START_WORKER=false and a separate worker container runs
     if (process.env.START_WORKER !== 'false') {
       workerInstance = createEmailWorker();
     }
@@ -78,7 +99,8 @@ export async function startServer() {
       console.log(`=================================================`);
       console.log(`🚀 ReachInbox Server running at http://localhost:${env.PORT}`);
       console.log(`📊 Bull Board Dashboard at http://localhost:${env.PORT}/admin/queues`);
-      console.log(`💻 Frontend Client configured at ${env.CLIENT_URL}`);
+      console.log(`💻 Allowed frontend origin: ${env.CLIENT_URL}`);
+      console.log(`🌐 Environment: ${env.NODE_ENV}`);
       console.log(`=================================================`);
     });
 
