@@ -10,8 +10,8 @@ interface DashboardLayoutProps {
   onOpenSlackModal: () => void;
   onOpenQueueModal?: () => void;
   // Sidebar-specific props
-  activeTab: 'scheduled' | 'sent';
-  onTabChange: (tab: 'scheduled' | 'sent') => void;
+  activeTab: 'scheduled' | 'sent' | 'queue';
+  onTabChange: (tab: 'scheduled' | 'sent' | 'queue') => void;
   scheduledCount: number;
   sentCount: number;
   onCompose: () => void;
@@ -129,13 +129,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* BullMQ Dashboard link */}
           <button
-            onClick={onOpenQueueModal}
+            onClick={() => (onOpenQueueModal ? onOpenQueueModal() : onTabChange('queue'))}
             title="Open BullMQ queue monitor"
-            className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors cursor-pointer"
+            className={`w-full flex items-center gap-2 px-3 py-2 border rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === 'queue'
+                ? 'bg-green-50 border-green-500 text-green-700 font-semibold'
+                : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700 hover:bg-green-50/50'
+            }`}
           >
             <Activity className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="flex-1 text-left">BullMQ Dashboard</span>
-            <svg className="w-3 h-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+            <span className={`w-1.5 h-1.5 rounded-full ${activeTab === 'queue' ? 'bg-green-600' : 'bg-emerald-500 animate-pulse'}`} />
           </button>
         </div>
 
@@ -193,52 +197,54 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {/* ── Main Content ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar: search + actions */}
-        <header className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 bg-white">
-          {/* Search */}
-          <div className="flex-1 max-w-md relative">
-            <svg
-              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400 transition-colors"
-            />
-          </div>
+        {/* Top bar: search + actions (rendered only on scheduled/sent tabs) */}
+        {activeTab !== 'queue' && (
+          <header className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 bg-white flex-shrink-0">
+            {/* Search */}
+            <div className="flex-1 max-w-md relative">
+              <svg
+                className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400 transition-colors"
+              />
+            </div>
 
-          {/* Filter icon */}
-          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-          </button>
+            {/* Filter icon */}
+            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+            </button>
 
-          {/* Refresh icon */}
-          <button
-            onClick={onRefresh}
-            disabled={refreshing}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-          >
-            <svg
-              className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`}
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            {/* Refresh icon */}
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="p-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             >
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          </button>
-        </header>
+              <svg
+                className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+          </header>
+        )}
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        <main className={`flex-1 ${activeTab === 'queue' ? 'flex flex-col min-h-0 overflow-hidden' : 'overflow-auto'}`}>
           {children}
         </main>
       </div>

@@ -3,6 +3,7 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { ComposeModal } from '../components/ComposeModal';
 import { SlackModal } from '../components/SlackModal';
 import { QueueMonitorModal } from '../components/QueueMonitorModal';
+import { QueueDashboardView } from '../components/QueueDashboardView';
 import { EmailListView } from '../components/EmailListView';
 import { Toast } from '../components/Toast';
 import { EmailItem, SlackStatus } from '../types/index';
@@ -10,7 +11,12 @@ import { api } from '../services/api';
 import { useSearchParams } from 'react-router-dom';
 
 export const DashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'scheduled' | 'sent'>('scheduled');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'scheduled' | 'sent' | 'queue'>(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'queue' || tab === 'sent') return tab;
+    return 'scheduled';
+  });
   const [scheduledEmails, setScheduledEmails] = useState<EmailItem[]>([]);
   const [sentEmails, setSentEmails] = useState<EmailItem[]>([]);
   const [totalScheduled, setTotalScheduled] = useState(0);
@@ -24,7 +30,17 @@ export const DashboardPage: React.FC = () => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [slackStatus, setSlackStatus] = useState<SlackStatus>({ connected: false });
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
+
+  const handleTabChange = (tab: 'scheduled' | 'sent' | 'queue') => {
+    setActiveTab(tab);
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'scheduled') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tab);
+    }
+    setSearchParams(newParams, { replace: true });
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -113,9 +129,9 @@ export const DashboardPage: React.FC = () => {
     <DashboardLayout
       slackStatus={slackStatus}
       onOpenSlackModal={() => setIsSlackOpen(true)}
-      onOpenQueueModal={() => setIsQueueOpen(true)}
+      onOpenQueueModal={() => handleTabChange('queue')}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
+      onTabChange={handleTabChange}
       scheduledCount={totalScheduled}
       sentCount={totalSent}
       onCompose={() => setIsComposeOpen(true)}
@@ -124,12 +140,16 @@ export const DashboardPage: React.FC = () => {
       onRefresh={() => fetchData(true)}
       refreshing={refreshing}
     >
-      <EmailListView
-        emails={baseList}
-        type={activeTab}
-        loading={loading}
-        onCompose={() => setIsComposeOpen(true)}
-      />
+      {activeTab === 'queue' ? (
+        <QueueDashboardView onBack={() => handleTabChange('scheduled')} />
+      ) : (
+        <EmailListView
+          emails={baseList}
+          type={activeTab}
+          loading={loading}
+          onCompose={() => setIsComposeOpen(true)}
+        />
+      )}
 
       {/* Modals & Toasts */}
       <ComposeModal
