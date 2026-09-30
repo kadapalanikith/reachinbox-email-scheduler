@@ -1,7 +1,8 @@
 import React from 'react';
-import { LogOut, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronDown, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SlackStatus } from '../types/index';
+import { API_BASE } from '../services/api';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,8 +21,17 @@ interface DashboardLayoutProps {
   refreshing: boolean;
 }
 
+const SlackIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
+  </svg>
+);
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
+  slackStatus,
+  onOpenSlackModal,
+  onOpenQueueModal,
   activeTab,
   onTabChange,
   scheduledCount,
@@ -88,6 +98,44 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             className="w-full py-2 border border-green-500 text-green-600 text-sm font-medium rounded-lg hover:bg-green-50 transition-colors cursor-pointer"
           >
             Compose
+          </button>
+        </div>
+
+        {/* ── Integrations section ── */}
+        <div className="px-3 pb-3 space-y-1.5">
+          {/* Slack connection button */}
+          {slackStatus.connected ? (
+            <button
+              onClick={onOpenSlackModal}
+              title={`Connected to ${slackStatus.connection?.teamName || 'Slack'}`}
+              className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              <SlackIcon className="w-3.5 h-3.5 flex-shrink-0 text-[#4A154B]" />
+              <span className="truncate flex-1 text-left">
+                {slackStatus.connection?.teamName || 'Slack Connected'}
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            </button>
+          ) : (
+            <button
+              onClick={() => { window.location.href = `${API_BASE}/slack/connect`; }}
+              title="Connect your Slack workspace"
+              className="w-full flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-xs font-medium text-gray-500 hover:border-[#4A154B] hover:text-[#4A154B] hover:bg-purple-50/50 transition-colors cursor-pointer"
+            >
+              <SlackIcon className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="flex-1 text-left">Connect Slack</span>
+            </button>
+          )}
+
+          {/* BullMQ Dashboard link */}
+          <button
+            onClick={onOpenQueueModal}
+            title="Open BullMQ queue monitor"
+            className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors cursor-pointer"
+          >
+            <Activity className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="flex-1 text-left">BullMQ Dashboard</span>
+            <svg className="w-3 h-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
           </button>
         </div>
 

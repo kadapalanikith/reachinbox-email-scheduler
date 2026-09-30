@@ -64,6 +64,10 @@ export const DashboardPage: React.FC = () => {
       showToast('Slack workspace successfully connected!');
       searchParams.delete('slack');
       setSearchParams(searchParams, { replace: true });
+    } else if (searchParams.get('slack_error')) {
+      showToast(`Slack connection failed: ${searchParams.get('slack_error')}`, 'error');
+      searchParams.delete('slack_error');
+      setSearchParams(searchParams, { replace: true });
     }
   }, [fetchData, fetchSlackStatus, searchParams, setSearchParams]);
 
